@@ -21,7 +21,7 @@ def segment_into_sents(paragraph):
     newline_separated = re.sub(regex_cannot_precede+"([\.\!\?]+([\'\’\"\)]*( |$)| [\'\’\"\) ]*))", r"\1\n", paragraph)
     sents = newline_separated.strip().split("\n")
     for s, sent in enumerate(sents):
-        sents[s] = "_BEGIN_ " + sent.strip() + " _END_"
+        sents[s] = sent.strip()
     return sents
 
 
@@ -87,7 +87,7 @@ def tok2logprobas(dict):
 def train_lm_unigram(sents):
     counts = tok2count(sents)
     prob = tok2logprobas(counts)
-    #print(sorted(counts.items(),key=operator.itemgetter(1)))
+    #print(sorted(prob.items(),key=operator.itemgetter(1)))
     return prob
 
 
@@ -99,13 +99,15 @@ def test_lm_unigram(sent,prob):
             probSent += prob[elem]        
     return probSent
 
+
 def bigram2counts(sents):
     #Create a dictionnary, read the 2D table and add words
     list = []
     for sent in sents:
-        for i in range(0,len(sent)):
-            if(sent[i] != "_END_"):
-                list.append(sent[i]+" "+sent[i+1])
+        sent.insert(0,"_BEGIN_")
+        sent.append("_END_")
+        for i in range(len(sent)-1):
+            list.append(sent[i]+" "+sent[i+1])
 
     counts = {}
     for sent in list:
@@ -131,6 +133,7 @@ def bigram2logprobas(counts):
     #print(sorted(logDict.items(),key=operator.itemgetter(1)))
     return logDict
 
+
 def train_lm_bigram(sents):
     counts = bigram2counts(sents)
     prob = bigram2logprobas(counts)
@@ -143,7 +146,7 @@ def test_lm_bigram(sent,prob):
     sent = "_BEGIN_ " + sent + " _END_" 
     tokens = tokenise(normalise(sent))
     list = []
-    for i in range(0,len(tokens)):
+    for i in range(len(tokens)):
             if(tokens[i] != "_END_"):
                 list.append(tokens[i]+" "+tokens[i+1])
 
@@ -151,6 +154,74 @@ def test_lm_bigram(sent,prob):
         if elem in prob.keys():
             probSent += prob[elem]        
     return probSent
+
+
+def ngram2counts(sents,N):
+    #Create a dictionnary, read the 2D table and add words
+    list = []
+    for sent in sents:
+        for i in range(N-1):
+            sent.insert(0,"_BEGIN_")
+            sent.append("_END_")
+
+    for sent in sents: 
+        for i in range(len(sent)-N+1):
+            temp = sent[i]
+            for j in range(1,N):
+                temp += " " + sent[i+j]
+            list.append(temp)
+
+    counts = {}
+    for sent in list:
+        if not sent in counts.keys():
+            counts[sent] = 1
+        else:
+            counts[sent] += 1
+
+    #print(sorted(counts.items(),key=operator.itemgetter(1)))
+    return counts
+
+
+def ngram2logprobas(counts):
+    logDict = {}
+    
+    count = 0
+    for elem in counts:
+        count += counts[elem]
+
+    for elem in counts:
+        logDict[elem] = math.log(counts[elem]/count)
+
+    #print(sorted(logDict.items(),key=operator.itemgetter(1)))
+    return logDict
+
+
+def train_lm_ngram(sents):
+    counts = ngram2counts(sents)
+    prob = ngram2logprobas(counts)
+    #print(sorted(prob.items(),key=operator.itemgetter(1)))
+    return prob
+
+
+def test_lm_ngram(sent,prob,N):
+    probSent = 0;
+    for i in range(N-1):
+            sent.insert(0,"_BEGIN_")
+            sent.append("_END_")
+
+    tokens = tokenise(normalise(sent))
+    list = []
+    for i in range(len(tokens)-N+1):
+            temp = tokens[i]
+            for j in range(1,N):
+                temp += " " + tokens[i+j]
+            list.append(temp)
+
+    for elem in list:
+        if elem in prob.keys():
+            probSent += prob[elem]        
+    return probSent
+
 
 if __name__=="__main__":
     with open(sys.argv[1],"r") as file_pointer:
@@ -160,7 +231,6 @@ if __name__=="__main__":
             sents.extend(segment_into_sents(p))
         sents[:] = [tokenise(normalise(sent)) for sent in sents]
         
-        train_lm_bigram(sents)
+        #train_lm_unigram(sents)
         #prob = train_lm_unigram(sents)
-        #print(test_lm_unigram("alice was beginning to get very tired",prob))
-        
+        ngram2counts(sents,5)
